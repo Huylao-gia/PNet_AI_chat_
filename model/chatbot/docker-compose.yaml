@@ -1,0 +1,68 @@
+# filepath: docker-compose.yml
+version: '3.8'
+
+services:
+  # -----------------------------------------------------
+  # 1. MICROSERVICE: LLM ENGINE (Chạy vLLM trên GPU)
+  # -----------------------------------------------------
+  llm_engine:
+    image: vllm/vllm-openai:latest
+    container_name: pet_vllm_engine
+    restart: unless-stopped
+    # CHÚ Ý: Chỉ expose cổng nội bộ 8000, KHÔNG public ra host để tránh bị gọi lén API
+    expose:
+      - "8000"
+    # Ánh xạ model và config vào trong container
+    volumes:
+      - ./model.gguf:/app/models/model.gguf:ro
+      - ./model-config:/app/models/model-config:ro
+    # Lệnh khởi chạy vLLM (Chuẩn xác cho file GGUF)
+    command: >
+      --model /app/models/model.gguf
+      --tokenizer /app/models/model-config
+      --served-model-name pet-chat-model
+      --max-model-len 4096
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.85
+      --port 8000
+    # Yêu cầu kích hoạt GPU của máy chủ
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - rag_network
+
+  # -----------------------------------------------------
+  # 2. MICROSERVICE: BACKEND API (FastAPI + ChromaDB)
+  # -----------------------------------------------------
+  api_backend:
+    build:
+      context: .
+      dockerfile: backend.Dockerfile
+    container_name: pet_rag_backend
+    restart: unless-stopped
+    # Public cổng 8080 ra ngoài cho Website/Trình duyệt truy cập
+    ports:
+      - "8080:8080"
+    # Ánh xạ VectorDB vào trong container
+    volumes:
+      - ./vectordb-processing/chroma_db:/app/data/vector_db
+    # Biến môi trường báo cho Backend biết cách kết nối với các thành phần khác
+    environment:
+      - VLLM_API_URL=http://llm_engine:8000/v1
+      - CHROMA_DB_PATH=/app/data/vector_db
+      - COLLECTION_NAME=pet_medical_docs
+      - EMBEDDING_MODEL=keepitreal/vietnamese-sbert
+    depends_on:
+      - llm_engine
+    networks:
+      - rag_network
+
+# Định nghĩa mạng nội bộ để 2 container gọi nhau qua tên (llm_engine, api_backend)
+networks:
+  rag_network:
+    driver: bridge
