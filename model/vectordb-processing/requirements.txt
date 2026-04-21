@@ -1,0 +1,5 @@
+PyMuPDF                     # Thư viện đọc file PDF (tên import là fitz)
+langchain-text-splitters    # Thư viện hỗ trợ cắt text thông minh
+sentence-transformers       # Chạy model Embedding
+chromadb                    # Vector Database
+tqdm                        # Hiển thị thanh tiến trình
