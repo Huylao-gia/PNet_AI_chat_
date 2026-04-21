@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+pydantic-settings
+chromadb
+sentence-transformers
+openai                  # Dùng OpenAI client để gọi giao thức chuẩn của vLLM
+httpx                   # Hỗ trợ gọi API bất đồng bộ (async)
